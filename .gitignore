@@ -1,0 +1,26 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Maven
+target/
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+
+# Node
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# VS Code
+.vscode/
