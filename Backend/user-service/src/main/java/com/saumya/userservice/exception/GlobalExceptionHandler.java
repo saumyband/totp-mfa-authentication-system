@@ -82,6 +82,20 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(MfaAlreadyEnabledException.class)
+    public ResponseEntity<Map<String, Object>> handleMfaAlreadyEnabled(
+            MfaAlreadyEnabledException ex) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        response.put("status", HttpStatus.CONFLICT.value());
+        response.put("message", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(response);
+    }
+
     // Catch Validation exception
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(

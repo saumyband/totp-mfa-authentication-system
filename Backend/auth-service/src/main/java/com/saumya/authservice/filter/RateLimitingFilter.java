@@ -1,5 +1,6 @@
 package com.saumya.authservice.filter;
 
+import tools.jackson.databind.ObjectMapper;
 import com.saumya.authservice.service.RateLimiterService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -7,10 +8,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -30,6 +35,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     );
 
     private final RateLimiterService rateLimiterService;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -54,10 +60,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (!rateLimiterService.tryAcquire(key)) {
             log.warn("Rate limit exceeded for {} on {}", request.getRemoteAddr(), request.getRequestURI());
 
-            response.sendError(429, "Too many requests");
+            writeJsonError(response, HttpStatus.TOO_MANY_REQUESTS, "Too many requests");
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    // Keeps error responses shaped like every controller-thrown error
+    // ({status, message} JSON via GlobalExceptionHandler), since filter-level
+    // rejections happen before a DispatcherServlet exception handler ever runs.
+    private void writeJsonError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status.value());
+        body.put("message", message);
+
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

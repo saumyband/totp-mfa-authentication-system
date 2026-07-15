@@ -1,11 +1,15 @@
 package com.saumya.userservice.filter;
 
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -15,6 +19,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * user-service is only ever meant to be called by auth-service (server-to-server),
@@ -24,12 +30,15 @@ import java.util.Collections;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class InternalApiKeyFilter extends OncePerRequestFilter {
 
     private static final String HEADER_NAME = "X-Internal-Api-Key";
 
     @Value("${internal.api-key}")
     private String internalApiKey;
+
+    private final ObjectMapper objectMapper;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -55,7 +64,7 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
                     request.getRequestURI()
             );
 
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
+            writeJsonError(response, HttpStatus.FORBIDDEN, "Forbidden");
             return;
         }
 
@@ -68,5 +77,18 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
         );
 
         filterChain.doFilter(request, response);
+    }
+
+    // Keeps error responses shaped like every controller-thrown error
+    // ({status, message} JSON via GlobalExceptionHandler), since filter-level
+    // rejections happen before a DispatcherServlet exception handler ever runs.
+    private void writeJsonError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status.value());
+        body.put("message", message);
+
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }
