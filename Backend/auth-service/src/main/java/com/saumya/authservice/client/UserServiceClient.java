@@ -2,6 +2,8 @@ package com.saumya.authservice.client;
 
 
 import com.saumya.authservice.dto.UserInfoResponse;
+import com.saumya.authservice.dto.VerifyPasswordRequest;
+import com.saumya.authservice.dto.VerifyPasswordResponse;
 import com.saumya.authservice.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,5 +40,18 @@ public class UserServiceClient {
                 null                            // null: Send a PUT request with no body
         );
 
+    }
+
+    public boolean verifyPassword(String email, String rawPassword) {
+        VerifyPasswordRequest request = new VerifyPasswordRequest();
+        request.setPassword(rawPassword);
+
+        VerifyPasswordResponse response = restTemplate.postForObject(
+                baseUrl + email + "/verify-password",
+                request,
+                VerifyPasswordResponse.class
+        );
+
+        return response != null && response.isValid();
     }
 }

@@ -83,6 +83,20 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(MfaAlreadyEnabledException.class)
+    public ResponseEntity<Map<String, Object>> handleMfaAlreadyEnabled(
+            MfaAlreadyEnabledException ex) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        response.put("status", HttpStatus.CONFLICT.value());
+        response.put("message", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(response);
+    }
+
     @ExceptionHandler(HttpClientErrorException.NotFound.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(
             HttpClientErrorException.NotFound ex) {

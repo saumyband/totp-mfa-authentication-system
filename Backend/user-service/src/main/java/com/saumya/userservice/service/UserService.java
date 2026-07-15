@@ -3,6 +3,7 @@ package com.saumya.userservice.service;
 import com.saumya.userservice.dto.RegisterRequest;
 import com.saumya.userservice.dto.RegisterResponse;
 import com.saumya.userservice.dto.UserDetailsResponse;
+import com.saumya.userservice.dto.VerifyPasswordResponse;
 import com.saumya.userservice.entity.User;
 import com.saumya.userservice.exception.UserAlreadyExistsException;
 import com.saumya.userservice.exception.UserNotFoundException;
@@ -57,9 +58,19 @@ public class UserService {
         return UserDetailsResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .passwordHash(user.getPasswordHash())
                 .mfaEnabled(user.getMfaEnabled())
                 .totpSecretEncrypted(user.getTotpSecretEncrypted())
+                .build();
+    }
+
+    public VerifyPasswordResponse verifyPassword(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+
+        boolean valid = passwordEncoder.matches(rawPassword, user.getPasswordHash());
+
+        return VerifyPasswordResponse.builder()
+                .valid(valid)
                 .build();
     }
 

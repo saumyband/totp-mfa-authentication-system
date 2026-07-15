@@ -1,27 +1,46 @@
 package com.saumya.userservice.util;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 
 @Component
 public class AesUtil {
 
-    private static final String SECRET_KEY = "1234567890123456";  // 16 bytes key
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final int GCM_IV_LENGTH_BYTES = 12;
+    private static final int GCM_TAG_LENGTH_BITS = 128;
+
+    // Base64-encoded 16/24/32-byte key. Generate with: openssl rand -base64 32
+    // Must match the AES_SECRET_KEY used by auth-service — one encrypts, the other decrypts.
+    @Value("${aes.secret-key}")
+    private String secretKey;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public String encrypt(String data) {
         try {
-            SecretKeySpec key = new SecretKeySpec(SECRET_KEY.getBytes(), "AES");
+            SecretKeySpec key = new SecretKeySpec(Base64.getDecoder().decode(secretKey), "AES");
 
-            Cipher cipher = Cipher.getInstance("AES");
+            byte[] iv = new byte[GCM_IV_LENGTH_BYTES];
+            secureRandom.nextBytes(iv);
 
-            cipher.init(Cipher.ENCRYPT_MODE, key);
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
 
             byte[] encrypted = cipher.doFinal(data.getBytes());
 
-            return Base64.getEncoder().encodeToString(encrypted);
+            byte[] ivAndCiphertext = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, ivAndCiphertext, 0, iv.length);
+            System.arraycopy(encrypted, 0, ivAndCiphertext, iv.length, encrypted.length);
+
+            return Base64.getEncoder().encodeToString(ivAndCiphertext);
         } catch (Exception e) {
             throw new RuntimeException("Encryption failed", e);
         }
@@ -29,15 +48,17 @@ public class AesUtil {
 
     public String decrypt(String encryptedData) {
         try {
-            SecretKeySpec key = new SecretKeySpec(SECRET_KEY.getBytes(), "AES");
+            SecretKeySpec key = new SecretKeySpec(Base64.getDecoder().decode(secretKey), "AES");
 
-            Cipher cipher = Cipher.getInstance("AES");
+            byte[] ivAndCiphertext = Base64.getDecoder().decode(encryptedData);
 
-            cipher.init(Cipher.DECRYPT_MODE, key);
+            byte[] iv = Arrays.copyOfRange(ivAndCiphertext, 0, GCM_IV_LENGTH_BYTES);
+            byte[] ciphertext = Arrays.copyOfRange(ivAndCiphertext, GCM_IV_LENGTH_BYTES, ivAndCiphertext.length);
 
-            byte[] decoded = Base64.getDecoder().decode(encryptedData);
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
 
-            return new String(cipher.doFinal(decoded));
+            return new String(cipher.doFinal(ciphertext));
         } catch (Exception e) {
             throw new RuntimeException("Decryption failed", e);
         }
