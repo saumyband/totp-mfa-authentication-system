@@ -3,11 +3,14 @@ package com.saumya.userservice.service;
 import com.saumya.userservice.dto.RegisterRequest;
 import com.saumya.userservice.dto.RegisterResponse;
 import com.saumya.userservice.dto.UserDetailsResponse;
+import com.saumya.userservice.dto.VerifyPasswordResponse;
 import com.saumya.userservice.entity.User;
+import com.saumya.userservice.exception.MfaAlreadyEnabledException;
 import com.saumya.userservice.exception.UserAlreadyExistsException;
 import com.saumya.userservice.exception.UserNotFoundException;
 import com.saumya.userservice.repository.UserRepository;
 import com.saumya.userservice.util.AesUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,20 +60,34 @@ public class UserService {
         return UserDetailsResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .passwordHash(user.getPasswordHash())
                 .mfaEnabled(user.getMfaEnabled())
                 .totpSecretEncrypted(user.getTotpSecretEncrypted())
                 .build();
     }
 
-    public void enableMfa(String email) {
-        User user = userRepository
-                .findByEmail(email)
+    public VerifyPasswordResponse verifyPassword(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
 
-        user.setMfaEnabled(true);
+        boolean valid = passwordEncoder.matches(rawPassword, user.getPasswordHash());
 
-        userRepository.save(user);
+        return VerifyPasswordResponse.builder()
+                .valid(valid)
+                .build();
+    }
+
+    @Transactional
+    public void enableMfa(String email) {
+        int updated = userRepository.enableMfaIfDisabled(email);
+
+        if (updated == 0) {
+            if (!userRepository.existsByEmail(email)) {
+                throw new UserNotFoundException("User not found with email: " + email);
+            }
+
+            log.warn("Rejected duplicate MFA-enable for already-enabled account: {}", email);
+            throw new MfaAlreadyEnabledException("MFA is already enabled for this account");
+        }
 
         log.info("MFA enabled for user: {}", email);
     }

@@ -10,7 +10,6 @@ import com.saumya.authservice.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jboss.aerogear.security.otp.Totp;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final UserServiceClient userServiceClient;
-    private final PasswordEncoder passwordEncoder;
     private final LoginSessionService loginSessionService;
     private final AesUtil aesUtil;
     private final JwtUtil jwtUtil;
@@ -29,10 +27,10 @@ public class AuthService {
         // Getting the user from user-service.
         UserInfoResponse user = userServiceClient.getUser(request.getEmail());
 
-        // Check if entered password matches the password present in DB. Done by comparing internal hashing.
-        boolean matches = passwordEncoder.matches(
-                request.getPassword(),
-                user.getPasswordHash()
+        // Password hash never leaves user-service — it verifies the match for us.
+        boolean matches = userServiceClient.verifyPassword(
+                request.getEmail(),
+                request.getPassword()
         );
 
         // If invalid password then throw Exception.

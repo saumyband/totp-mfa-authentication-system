@@ -2,6 +2,9 @@ package com.saumya.authservice.client;
 
 
 import com.saumya.authservice.dto.UserInfoResponse;
+import com.saumya.authservice.dto.VerifyPasswordRequest;
+import com.saumya.authservice.dto.VerifyPasswordResponse;
+import com.saumya.authservice.exception.MfaAlreadyEnabledException;
 import com.saumya.authservice.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,10 +36,28 @@ public class UserServiceClient {
     }
 
     public void enableMfa(String email) {
-        restTemplate.put(
-                baseUrl + "mfa/enable/" + email,
-                null                            // null: Send a PUT request with no body
+        try {
+            restTemplate.put(
+                    baseUrl + "mfa/enable/" + email,
+                    null                            // null: Send a PUT request with no body
+            );
+        } catch (HttpClientErrorException.Conflict ex) {
+            // user-service's enable-if-disabled update lost the race (concurrent
+            // activation already flipped it) — surface the same 409 here.
+            throw new MfaAlreadyEnabledException("MFA is already enabled for this account");
+        }
+    }
+
+    public boolean verifyPassword(String email, String rawPassword) {
+        VerifyPasswordRequest request = new VerifyPasswordRequest();
+        request.setPassword(rawPassword);
+
+        VerifyPasswordResponse response = restTemplate.postForObject(
+                baseUrl + email + "/verify-password",
+                request,
+                VerifyPasswordResponse.class
         );
 
+        return response != null && response.isValid();
     }
 }

@@ -3,6 +3,8 @@ package com.saumya.userservice.controller;
 import com.saumya.userservice.dto.RegisterRequest;
 import com.saumya.userservice.dto.RegisterResponse;
 import com.saumya.userservice.dto.UserDetailsResponse;
+import com.saumya.userservice.dto.VerifyPasswordRequest;
+import com.saumya.userservice.dto.VerifyPasswordResponse;
 import com.saumya.userservice.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,16 @@ public class UserController {
         userService.enableMfa(email);
 
         return ResponseEntity.ok().build();
+    }
+
+    // Password hash never leaves user-service — callers only get a yes/no answer.
+    @PostMapping("/{email}/verify-password")
+    public ResponseEntity<VerifyPasswordResponse> verifyPassword(
+            @PathVariable String email,
+            @Valid @RequestBody VerifyPasswordRequest request) {
+        return ResponseEntity.ok(
+                userService.verifyPassword(email, request.getPassword())
+        );
     }
 
 }

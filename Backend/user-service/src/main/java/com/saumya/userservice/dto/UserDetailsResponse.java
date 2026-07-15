@@ -11,7 +11,6 @@ public class UserDetailsResponse {
 
     private Long id;
     private String email;
-    private String passwordHash;
     private Boolean mfaEnabled;
     private String totpSecretEncrypted;
 }
